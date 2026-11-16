@@ -10,19 +10,21 @@ const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 const tidy = s => String(s || "").replace(/\s+/g, " ").trim();
 const SVG = "http://www.w3.org/2000/svg";
 
-/* ---------- The drawn cake ---------- */
+/* ---------- The cake: smooth fondant on a silver board, drawn so the icing can change colour ---------- */
 
+// Each icing has the tones that shade the cake (light, base, shade, deep) and a colour for the writing.
 const SCHEMES = {
-  white: { name: "White", top: "#fbf7ef", side: "#ece3d1", bead: "#fffdf7", pipe: "#0e6e73" },
-  blue: { name: "Shades of blue", top: "#d3e4ef", side: "#a9c8dc", bead: "#e9f2f8", pipe: "#1f3a6b" },
-  blush: { name: "Blush", top: "#f7dcdf", side: "#efc2c8", bead: "#fcecee", pipe: "#a3213a" },
-  pistachio: { name: "Pistachio", top: "#e2eab9", side: "#c7d68f", bead: "#f0f4d8", pipe: "#b23d5c" },
-  chocolate: { name: "Chocolate", top: "#734129", side: "#58301e", bead: "#86523a", pipe: "#f3d9a4" },
+  white: { name: "White", light: "#fffefa", base: "#f5f0e4", shade: "#e2d9c6", deep: "#cbbfa7", pipe: "#0e6e73" },
+  blue: { name: "Shades of blue", light: "#eef5fb", base: "#c9dded", shade: "#a7c3da", deep: "#8eaecb", pipe: "#1f3a6b" },
+  blush: { name: "Blush", light: "#fdf0f2", base: "#f3d2d7", shade: "#e2b3bb", deep: "#cf9aa4", pipe: "#a3213a" },
+  pistachio: { name: "Pistachio", light: "#f3f7e1", base: "#dbe5ad", shade: "#c2d088", deep: "#a9ba6c", pipe: "#b23d5c" },
+  chocolate: { name: "Chocolate", light: "#9a6649", base: "#6e3f27", shade: "#57301c", deep: "#432414", pipe: "#f3d9a4" },
 };
 
 const cake = document.getElementById("cake");
-const CX = 200, TOP = 112, RX = 150, RY = 62, BOTTOM = 220;
-let msgText, clipRect;
+// The cake (centre, radius, how deep its ellipses look, top and bottom of the side) and the board under it.
+const CX = 200, RX = 128, RY = 28, TOP = 96, BOTTOM = 236, BOARD_Y = 246, BRX = 176, BRY = 44;
+let msgText, msgLines, clipRect;
 
 function el(name, attrs, parent) {
   const n = document.createElementNS(SVG, name);
@@ -31,71 +33,87 @@ function el(name, attrs, parent) {
   return n;
 }
 
-// A ring of piped beads along an ellipse, from angle a to angle b; beads at the front are a little larger.
-function beads(parent, cy, r, a, b, n) {
-  const g = el("g", {}, parent);
-  for (let i = 0; i <= n; i++) {
-    const t = a + (b - a) * i / n;
-    const x = CX + RX * Math.cos(t), y = cy + RY * Math.sin(t);
-    const rr = r * (0.78 + 0.22 * (Math.sin(t) + 1) / 2);
-    el("circle", { cx: x.toFixed(1), cy: y.toFixed(1), r: rr.toFixed(1), class: "ck-fill", style: "fill: var(--ck-bead)" }, g);
-    el("circle", { cx: (x - rr * .3).toFixed(1), cy: (y - rr * .35).toFixed(1), r: (rr * .32).toFixed(1), fill: "#fff", opacity: ".6" }, g);
+// A gradient across (left to right) or down; colours may be CSS variables, so they go in style.
+function gradient(defs, id, across, stops) {
+  const g = el("linearGradient", across ? { id } : { id, x2: 0, y2: 1 }, defs);
+  for (const [offset, colour, alpha] of stops) {
+    el("stop", { offset, style: `stop-color: ${colour}` + (alpha === undefined ? "" : `; stop-opacity: ${alpha}`) }, g);
   }
 }
+
+// The front half of an ellipse as deep as the cake's, left to right, with its lowest point at y:
+// the curve that a line of writing follows around the side.
+const frontArc = (y, rx = RX) => `M${CX - rx},${y - RY} A${rx},${RY} 0 0 0 ${CX + rx},${y - RY}`;
 
 function drawCake() {
   if (!cake) return;
   cake.replaceChildren();
   const defs = el("defs", {}, cake);
+  const soft = el("filter", { id: "ck-soft", x: "-20%", y: "-60%", width: "140%", height: "220%" }, defs);
+  el("feGaussianBlur", { stdDeviation: 5 }, soft);
+  // Light from the upper left: the side is shaded like a cylinder, the top is brightest
+  gradient(defs, "ck-side", true, [[0, "var(--ck-deep)"], [.16, "var(--ck-shade)"], [.42, "var(--ck-light)"], [.66, "var(--ck-base)"], [.9, "var(--ck-shade)"], [1, "var(--ck-deep)"]]);
+  gradient(defs, "ck-fade", false, [[0, "#fff", .45], [.14, "#fff", 0], [.8, "#000", 0], [1, "#000", .16]]);
+  gradient(defs, "ck-top", true, [[0, "var(--ck-light)"], [.6, "var(--ck-light)"], [1, "var(--ck-base)"]]);
+  gradient(defs, "ck-board", true, [[0, "#a3abb3"], [.2, "#eef1f4"], [.4, "#c2c8ce"], [.62, "#f7f9fb"], [.84, "#c6ccd2"], [1, "#98a0a8"]]);
+  msgLines = [0, 1, 2].map(i => el("path", { id: `ck-line-${i}`, fill: "none" }, defs));
   const clip = el("clipPath", { id: "pipe-clip" }, defs);
-  clipRect = el("rect", { x: 40, y: 30, width: 0, height: 180 }, clip);
-  el("ellipse", { cx: CX, cy: BOTTOM + 30, rx: 182, ry: RY + 10, fill: "#b98a1f" }, cake);
-  el("ellipse", { cx: CX, cy: BOTTOM + 22, rx: 182, ry: RY + 10, fill: "#d9a92c" }, cake);
-  el("path", { d: `M${CX - RX},${TOP} L${CX - RX},${BOTTOM} A${RX},${RY} 0 0 0 ${CX + RX},${BOTTOM} L${CX + RX},${TOP} Z`, class: "ck-fill", style: "fill: var(--ck-side)" }, cake);
-  el("ellipse", { cx: CX, cy: TOP, rx: RX, ry: RY, class: "ck-fill", style: "fill: var(--ck-top)" }, cake);
-  beads(cake, TOP, 8, Math.PI, 2 * Math.PI, 26);
+  clipRect = el("rect", { x: CX - RX - 12, y: TOP, width: 0, height: BOTTOM - TOP + RY + 12 }, clip);
+
+  // The silver board on the table: its shadow, its edge, the foil
+  el("ellipse", { cx: CX, cy: BOARD_Y + 20, rx: BRX + 6, ry: BRY * .75, fill: "#000", opacity: .22, filter: "url(#ck-soft)" }, cake);
+  el("ellipse", { cx: CX, cy: BOARD_Y + 7, rx: BRX, ry: BRY, fill: "#8d959d" }, cake);
+  el("ellipse", { cx: CX, cy: BOARD_Y, rx: BRX, ry: BRY, fill: "url(#ck-board)" }, cake);
+  el("ellipse", { cx: CX, cy: BOARD_Y, rx: BRX - 9, ry: BRY - 6, fill: "none", stroke: "#fff", "stroke-opacity": .5, "stroke-width": 1.4 }, cake);
+  // The cake's shadow on the board
+  el("ellipse", { cx: CX + 8, cy: BOTTOM + 8, rx: RX + 10, ry: RY + 7, fill: "#000", opacity: .28, filter: "url(#ck-soft)" }, cake);
+  // The side, then the light on its upper part and the shade at its foot
+  const side = `M${CX - RX},${TOP} L${CX - RX},${BOTTOM} A${RX},${RY} 0 0 0 ${CX + RX},${BOTTOM} L${CX + RX},${TOP} Z`;
+  el("path", { d: side, fill: "url(#ck-side)" }, cake);
+  el("path", { d: side, fill: "url(#ck-fade)" }, cake);
+  // The top, and its soft fondant edge catching the light
+  el("ellipse", { cx: CX, cy: TOP, rx: RX, ry: RY, fill: "url(#ck-top)" }, cake);
+  el("path", { d: frontArc(TOP + RY, RX - 2), fill: "none", style: "stroke: var(--ck-light)", "stroke-width": 5, "stroke-linecap": "round" }, cake);
+
+  // The writing, on the front of the side, following its curve
   const writing = el("g", { "clip-path": "url(#pipe-clip)" }, cake);
-  const plane = el("g", { transform: `translate(${CX} ${TOP + 4}) scale(1 .62)` }, writing);
   msgText = el("text", {
-    "text-anchor": "middle", "dominant-baseline": "middle", "font-family": "Satisfy, cursive", "font-size": 58,
-    class: "ck-fill", style: "fill: var(--ck-pipe); stroke: var(--ck-pipe)", "stroke-width": 1.1, "stroke-linejoin": "round",
-  }, plane);
-  beads(cake, TOP, 8, 0, Math.PI, 26);
-  beads(cake, BOTTOM, 10, 0, Math.PI, 24);
+    "font-family": "Satisfy, cursive", "font-size": 44, "text-anchor": "middle",
+    style: "fill: var(--ck-pipe); stroke: var(--ck-pipe)", "stroke-width": 1, "stroke-linejoin": "round",
+  }, writing);
 }
 
 function paintCake(colour) {
   const s = SCHEMES[colour] || SCHEMES.white;
-  cake.style.setProperty("--ck-top", s.top);
-  cake.style.setProperty("--ck-side", s.side);
-  cake.style.setProperty("--ck-bead", s.bead);
-  cake.style.setProperty("--ck-pipe", s.pipe);
+  for (const k of ["light", "base", "shade", "deep", "pipe"]) cake.style.setProperty(`--ck-${k}`, s[k]);
 }
 
-// Fits the message inside the top of the cake: smaller first, then on two lines split nearest the middle.
-const MAX_W = 236;
+// One line across the middle of the side (smaller if it is long), or two lines split nearest the middle.
+const MAX_W = 196, MID = (TOP + BOTTOM) / 2 + RY;
+function line(i, text, y) {
+  msgLines[i].setAttribute("d", frontArc(y));
+  const t = el("textPath", { href: `#ck-line-${i}`, startOffset: "50%" }, msgText);
+  t.textContent = text;
+  return t;
+}
 function writeMessage(msg) {
   if (!msgText) return;
   msgText.replaceChildren();
-  msgText.setAttribute("font-size", 58);
-  msgText.textContent = msg || " ";
-  let w = msgText.getComputedTextLength();
+  msgText.setAttribute("font-size", 44);
+  const w = line(0, msg || " ", MID + 14).getComputedTextLength();
   if (w <= MAX_W) return;
-  const one = Math.floor(58 * MAX_W / w);
-  if (one >= 40 || !msg.includes(" ")) {
-    msgText.setAttribute("font-size", Math.max(one, 18));
+  const size = Math.floor(44 * MAX_W / w);
+  if (size >= 32 || !msg.includes(" ")) {
+    msgText.setAttribute("font-size", Math.max(size, 16));
     return;
   }
   const spaces = [...msg.matchAll(/ /g)].map(m => m.index);
   const cut = spaces.reduce((a, c) => Math.abs(c - msg.length / 2) < Math.abs(a - msg.length / 2) ? c : a);
   msgText.replaceChildren();
-  let size = 52;
-  msgText.setAttribute("font-size", size);
-  const lines = [msg.slice(0, cut), msg.slice(cut + 1)].map((line, i) => el("tspan", { x: 0, dy: i ? "1.02em" : "-0.5em" }, msgText));
-  lines[0].textContent = msg.slice(0, cut);
-  lines[1].textContent = msg.slice(cut + 1);
-  w = Math.max(lines[0].getComputedTextLength(), lines[1].getComputedTextLength());
-  if (w > MAX_W) msgText.setAttribute("font-size", Math.floor(size * MAX_W / w));
+  msgText.setAttribute("font-size", 38);
+  const lines = [line(1, msg.slice(0, cut), MID - 6), line(2, msg.slice(cut + 1), MID + 34)];
+  const widest = Math.max(...lines.map(l => l.getComputedTextLength()));
+  if (widest > MAX_W) msgText.setAttribute("font-size", Math.floor(38 * MAX_W / widest));
 }
 
 // The piping: the message is revealed left to right, as a piping bag would write it.
@@ -210,7 +228,7 @@ function update() {
   const scheme = SCHEMES[s.colour] || SCHEMES.white;
   paintCake(s.colour);
   writeMessage(s.message);
-  cake.setAttribute("aria-label", `${scheme.name} cake${s.message ? ` with "${s.message}" piped on top` : ""}`);
+  cake.setAttribute("aria-label", `${scheme.name} cake${s.message ? ` with "${s.message}" written on it` : ""}`);
   tagOut("t-occasion").textContent = s.occasion;
   tagOut("t-flavour").textContent = flavourLine(s);
   tagOut("t-colour").textContent = scheme.name;
