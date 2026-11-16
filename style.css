@@ -97,7 +97,8 @@ a { color: inherit; }
   display: flex; align-items: center; gap: 24px;
   height: var(--bar-h); max-width: 1680px; margin: 0 auto; padding: 0 var(--m) 6px;
 }
-.wordmark { font-family: var(--script); font-size: 31px; line-height: 1; color: var(--ink); text-decoration: none; white-space: nowrap; }
+.wordmark { font-family: var(--script); font-size: 31px; line-height: 1; color: var(--ink); text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 10px; }
+.wm-logo { height: 54px; width: auto; flex: none; }
 .wordmark .wm-tci { font-family: var(--text); font-weight: 600; font-size: .52em; letter-spacing: .12em; margin-left: .3em; }
 .menu-btn {
   display: none; margin-left: auto; align-items: center; gap: 12px;
@@ -515,6 +516,9 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
 .foot-grid a { text-decoration: none; }
 .foot-grid a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .foot-contact { grid-column: 9 / 13; display: grid; gap: 12px; }
+/* Her logo on a card, a little crooked, like the magnets she gives out */
+.foot-logo { grid-column: 7 / 9; align-self: start; justify-self: center; width: 100%; max-width: 190px; background: var(--paper); border-radius: 22px; padding: 14px 16px; transform: rotate(-3deg); }
+.foot-logo img { display: block; width: 100%; height: auto; }
 .foot-last { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-top: 56px; font-size: var(--step-small); }
 .foot-last p { max-width: 70ch; opacity: .92; }
 
@@ -563,7 +567,8 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
   .topbar { padding-bottom: 26px; }
   .topbar-in { height: 54px; padding-bottom: 0; }
   .walker { width: 21px; height: 26px; }
-  .wordmark { font-size: 27px; }
+  .wordmark { font-size: 27px; gap: 7px; }
+  .wm-logo { height: 36px; }
   .menu-btn { display: inline-flex; }
   .site-nav {
     position: absolute; top: 100%; left: 0; right: 0;
@@ -670,9 +675,12 @@ textarea::placeholder { color: var(--muted); opacity: 1; }
   .foot-grid { grid-template-columns: 1fr 1fr; }
   .foot-grid ul { grid-column: auto; }
   .foot-contact { grid-column: 1 / -1; }
+  .foot-logo { grid-column: 1 / -1; justify-self: start; max-width: 160px; }
   .foot-last { flex-wrap: wrap; }
 }
 @media (max-width: 380px) {
+  .wordmark { font-size: 24px; gap: 6px; }
+  .wm-logo { height: 32px; }
   .chip span { padding: 0 15px; }
   .checks { gap: 6px 14px; }
 }
