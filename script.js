@@ -305,7 +305,7 @@ function buildBlocks() {
   const narrow = innerWidth < 700;
   if (narrow === blocksNarrow) return;
   blocksNarrow = narrow;
-  const rows = narrow ? ["THE CAKE", "LADY"] : ["THE CAKE LADY"];
+  const rows = narrow ? ["THE CAKE", "LADY TCI"] : ["THE CAKE LADY TCI"];
   const W = 1200, gap = 6, rowH = narrow ? 330 : 260, rowGap = 14;
   blocksG.replaceChildren();
   let k = 0;
