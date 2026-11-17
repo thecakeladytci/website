@@ -1,4 +1,4 @@
-// The Cake Lady: the cake planner (the message piped on a drawn cake, the date check against her lead times, the WhatsApp brief),
+// The Cake Lady: the cake planner (the message piped on a drawn cake, the date check against her lead times and closed days, the WhatsApp brief),
 // section reveals, the drifting strip of cakes and the footer name built from blocks.
 document.documentElement.classList.add("js");
 
@@ -151,6 +151,16 @@ const parseDate = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ""); re
 const longDate = d => d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 const shortDate = d => d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
+// Days Adele has closed in her calendar (fully booked or away): the first and the last day, both included.
+// To close more days, add a line like ["2027-01-02", "2027-01-05"]; for a single day, write the same date twice.
+const CLOSED = [
+  ["2026-12-21", "2026-12-26"],
+];
+const closedRange = date => CLOSED.map(([a, b]) => [parseDate(a), parseDate(b)]).find(([a, b]) => date >= a && date <= b);
+const dayMonth = d => d.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+const rangeText = ([a, b]) => +a === +b ? `on ${dayMonth(a)}`
+  : `from ${a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear() ? a.getDate() : dayMonth(a)} to ${dayMonth(b)}`;
+
 function read() {
   const d = new FormData(form);
   return {
@@ -175,6 +185,8 @@ function timing(date) {
   if (!date) return "Pick the date and you will see if there is still time.";
   const days = Math.round((date - startOfToday()) / DAY);
   if (days < 0) return "That date has already passed. Pick the day of your celebration.";
+  const closed = closedRange(date);
+  if (closed) return `Adele's calendar is closed ${rangeText(closed)}. Please pick another date for your cake.`;
   if (days < 7) {
     const when = days === 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
     return `That is ${when}, which is short notice. Message Adele right away and she will tell you what is still possible.`;
