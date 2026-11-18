@@ -161,6 +161,143 @@ const dayMonth = d => d.toLocaleDateString("en-GB", { day: "numeric", month: "lo
 const rangeText = ([a, b]) => +a === +b ? `on ${dayMonth(a)}`
   : `from ${a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear() ? a.getDate() : dayMonth(a)} to ${dayMonth(b)}`;
 
+// The date picker. A phone's own calendar cannot cross out single days, so the script swaps the plain date field
+// for a month calendar where past and closed days cannot be picked. Without the script, the plain date field stays.
+let dateBtn = null;
+const yearDate = d => d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+
+function datePicker() {
+  const label = form.querySelector('label[for="p-date"]');
+  const row = dateInput.closest(".field-row");
+  if (!label || !row) return;
+  const today = startOfToday();
+  const monthOf = d => new Date(d.getFullYear(), d.getMonth(), 1);
+  const first = monthOf(today);
+  const last = new Date(today.getFullYear(), today.getMonth() + 24, 1);
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const unavailable = d => d < today ? "already passed" : closedRange(d) ? "closed" : "";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "date-btn";
+  btn.id = "p-date-btn";
+  btn.textContent = "Choose the date";
+  btn.setAttribute("aria-expanded", "false");
+  btn.setAttribute("aria-controls", "p-cal");
+  label.id = "p-date-label";
+  label.htmlFor = btn.id;
+  btn.setAttribute("aria-labelledby", "p-date-label p-date-btn");
+
+  const cal = document.createElement("div");
+  cal.className = "cal";
+  cal.id = "p-cal";
+  cal.hidden = true;
+  cal.setAttribute("role", "group");
+  cal.setAttribute("aria-label", "Calendar");
+  cal.innerHTML = `<div class="cal-head">
+      <button type="button" class="cal-nav" data-dir="-1" aria-label="Previous month">‹</button>
+      <p class="cal-title" aria-live="polite"></p>
+      <button type="button" class="cal-nav" data-dir="1" aria-label="Next month">›</button>
+    </div>
+    <div class="cal-week" aria-hidden="true">${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(w => `<span>${w}</span>`).join("")}</div>
+    <div class="cal-days"></div>
+    <p class="cal-key"></p>`;
+  const title = cal.querySelector(".cal-title");
+  const days = cal.querySelector(".cal-days");
+  const key = cal.querySelector(".cal-key");
+  const [prev, next] = cal.querySelectorAll(".cal-nav");
+  let view = first;
+  let focusDate = today;
+
+  function render(focus) {
+    const chosen = parseDate(dateInput.value);
+    title.textContent = view.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+    prev.setAttribute("aria-disabled", String(+view <= +first));
+    next.setAttribute("aria-disabled", String(+view >= +last));
+    const count = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
+    let html = "<span></span>".repeat(view.getDay());
+    for (let n = 1; n <= count; n++) {
+      const d = new Date(view.getFullYear(), view.getMonth(), n);
+      const off = unavailable(d);
+      const picked = chosen && +d === +chosen;
+      html += `<button type="button" class="cal-day${off === "closed" ? " is-closed" : ""}${picked ? " is-chosen" : ""}" data-date="${iso(d)}" tabindex="-1"`
+        + `${off ? ' aria-disabled="true"' : ""}${+d === +today ? ' aria-current="date"' : ""}`
+        + ` aria-label="${longDate(d)}${off ? `, ${off}` : picked ? ", chosen" : ""}">${n}</button>`;
+    }
+    days.innerHTML = html;
+    // One day of the month takes the Tab key; the arrow keys move between the days.
+    const target = days.querySelector(`[data-date="${iso(focusDate)}"]`) || days.querySelector(".cal-day");
+    target.tabIndex = 0;
+    if (focus) target.focus();
+    const ahead = CLOSED.map(([a, b]) => [parseDate(a), parseDate(b)]).filter(([, b]) => b >= today);
+    key.textContent = ahead.length ? `Adele's calendar is closed ${ahead.map(rangeText).join(" and ")}, so those days are crossed out.` : "";
+    key.hidden = !ahead.length;
+  }
+
+  function show(d) {
+    focusDate = d;
+    if (+monthOf(d) !== +view) { view = monthOf(d); render(true); return; }
+    days.querySelectorAll(".cal-day").forEach(b => { b.tabIndex = -1; });
+    const target = days.querySelector(`[data-date="${iso(d)}"]`);
+    target.tabIndex = 0;
+    target.focus();
+  }
+
+  function open() {
+    const chosen = parseDate(dateInput.value);
+    focusDate = chosen && chosen >= today ? chosen : today;
+    view = monthOf(focusDate);
+    cal.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    render(true);
+  }
+
+  function close(refocus) {
+    cal.hidden = true;
+    btn.setAttribute("aria-expanded", "false");
+    if (refocus) btn.focus();
+  }
+
+  btn.addEventListener("click", () => (cal.hidden ? open() : close(false)));
+  [prev, next].forEach(b => b.addEventListener("click", () => {
+    if (b.getAttribute("aria-disabled") === "true") return;
+    view = new Date(view.getFullYear(), view.getMonth() + Number(b.dataset.dir), 1);
+    focusDate = new Date(view.getFullYear(), view.getMonth(), Math.min(focusDate.getDate(), 28));
+    render(false);
+  }));
+  days.addEventListener("click", e => {
+    const b = e.target.closest(".cal-day");
+    if (!b || b.getAttribute("aria-disabled") === "true") return;
+    dateInput.value = b.dataset.date;
+    close(true);
+    update();
+  });
+  cal.addEventListener("keydown", e => {
+    if (e.key === "Escape") { e.preventDefault(); close(true); return; }
+    if (!e.target.classList.contains("cal-day")) return;
+    const cur = parseDate(e.target.dataset.date);
+    const y = cur.getFullYear(), m = cur.getMonth(), n = cur.getDate();
+    const moves = {
+      ArrowLeft: [y, m, n - 1], ArrowRight: [y, m, n + 1], ArrowUp: [y, m, n - 7], ArrowDown: [y, m, n + 7],
+      Home: [y, m, n - cur.getDay()], End: [y, m, n + 6 - cur.getDay()],
+      PageUp: [y, m - 1, Math.min(n, 28)], PageDown: [y, m + 1, Math.min(n, 28)],
+    };
+    if (!moves[e.key]) return;
+    e.preventDefault();
+    const to = new Date(...moves[e.key]);
+    if (monthOf(to) < first || monthOf(to) > last) return;
+    show(to);
+  });
+
+  // A date the browser kept from an earlier visit is dropped if it has passed or Adele has closed it since.
+  const kept = parseDate(dateInput.value);
+  if (kept && unavailable(kept)) dateInput.value = "";
+  dateInput.type = "hidden";
+  dateInput.after(btn);
+  row.after(cal);
+  dateBtn = btn;
+}
+
 function read() {
   const d = new FormData(form);
   return {
@@ -246,6 +383,7 @@ function update() {
   tagOut("t-colour").textContent = scheme.name;
   tagOut("t-guests").textContent = `${s.guests || "?"} guests`;
   tagOut("t-date").textContent = s.date ? shortDate(s.date) : "Date to choose";
+  if (dateBtn) dateBtn.textContent = s.date ? yearDate(s.date) : "Choose the date";
   tagOut("t-hand").textContent = s.delivery ? "Delivery" : (s.pickup ? `Pickup, ${s.pickup}` : "Pickup, Discovery Bay");
   if (pickupWhen) pickupWhen.hidden = s.delivery;
   timeCheck.textContent = timing(s.date);
@@ -261,6 +399,7 @@ if (form && cake) {
   drawCake();
   const t = startOfToday();
   dateInput.min = `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+  datePicker();
   // The colour and the message sit beside the cake, outside the form element, so listen wherever the planner's fields are.
   const ownField = e => e.target.form === form;
   document.addEventListener("input", e => { if (ownField(e)) update(); });

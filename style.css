@@ -334,6 +334,39 @@ input::placeholder { color: var(--muted); opacity: 1; }
 .step-btn:hover { background: var(--sea); }
 .step-btn:active { transform: scale(.92); }
 
+/* The calendar that replaces the phone's own date field: past and closed days cannot be picked */
+.date-btn {
+  width: 100%; min-height: 52px; padding: 0 20px; border: 0; border-radius: 999px; text-align: left;
+  background: var(--paper); color: var(--ink); font: 400 var(--step-body)/1.2 var(--text); cursor: pointer;
+  transition: background-color .2s, color .2s;
+}
+.date-btn:hover { background: #fff; }
+.date-btn[aria-expanded="true"] { background: var(--ink); color: var(--paper); }
+.cal { width: min(100%, 420px); margin-top: -16px; padding: 18px; border-radius: 28px; background: var(--paper); }
+.cal-head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cal-title { text-align: center; font-weight: 600; font-size: var(--step-body); }
+.cal-nav {
+  width: 44px; height: 44px; border: 0; border-radius: 50%; background: var(--ink); color: var(--paper);
+  font: 500 24px/1 var(--text); cursor: pointer; transition: background-color .2s, transform .15s var(--ease);
+}
+.cal-nav:hover { background: var(--sea); }
+.cal-nav:active { transform: scale(.92); }
+.cal-nav[aria-disabled="true"] { background: var(--surface); color: var(--muted); cursor: default; transform: none; }
+.cal-week, .cal-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.cal-week span { padding: 4px 0; text-align: center; font-size: var(--step-small); color: var(--muted); }
+.cal-day {
+  aspect-ratio: 1; min-height: 36px; border: 0; border-radius: 50%; background: transparent; color: var(--ink);
+  font: 400 var(--step-body)/1 var(--text); font-variant-numeric: tabular-nums; cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+@media (hover: hover) { .cal-day:hover { background: var(--aqua); } }
+.cal-day:focus-visible { outline-offset: 0; }
+.cal-day[aria-current="date"] { box-shadow: inset 0 0 0 2px var(--sea); }
+.cal-day.is-chosen { background: var(--ink); color: var(--paper); }
+.cal-day[aria-disabled="true"] { background: transparent; color: rgba(46, 29, 20, .35); cursor: default; }
+.cal-day.is-closed { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--tangerine); text-decoration-thickness: 2px; }
+.cal-key { margin-top: 12px; font-size: var(--step-small); color: var(--muted); }
+
 .stage .field legend, .stage .field > label { color: var(--ink); }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px 18px; }
 .swatch { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; font-size: var(--step-body); }
